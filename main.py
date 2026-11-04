@@ -1,4 +1,3 @@
-
 """
 Main entry point for SIFT vs ORB experiments.
 
@@ -6,6 +5,7 @@ Usage:
     python main.py -sift
     python main.py -orb
     python main.py -sift -orb
+    python main.py -sift -orb -perturb
 """
 
 import argparse
@@ -48,7 +48,8 @@ def main():
             method="SIFT",
             create_detector=create_detector,
             detect_and_describe=detect_and_describe,
-            match_descriptors=match_descriptors
+            match_descriptors=match_descriptors,
+            run_perturbations=args.perturb
         )
 
     if args.orb:
@@ -62,7 +63,8 @@ def main():
             method="ORB",
             create_detector=create_detector,
             detect_and_describe=detect_and_describe,
-            match_descriptors=match_descriptors
+            match_descriptors=match_descriptors,
+            run_perturbations=args.perturb
         )
 
 

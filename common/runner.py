@@ -1,4 +1,3 @@
-
 """
 Shared HPatches experiment runner for SIFT and ORB.
 
@@ -21,10 +20,13 @@ from common.config import (
     SCENES,
     REPROJECTION_THRESHOLD,
     REFERENCE_IMAGE,
-    TARGET_IMAGES
+    TARGET_IMAGES,
+    PERTURBATION_LEVELS,
+    SAVE_PERTURBATION_VISUALIZATIONS
 )
 from common.dataset import load_scene
 from common.evaluate import evaluate_matches
+from common.perturb import perturb
 from common.visualize import save_match_visualizations
 
 
@@ -135,6 +137,109 @@ def run_scene(scene_name, detector, detect_and_describe, match_descriptors, meth
             f"Precision: {precision:.2f}% | "
             f"Mean error: {error_text}"
         )
+
+    return results
+
+def run_perturbation_scene(scene_name, detector, detect_and_describe, match_descriptors, method):
+    """
+    Evaluate one scene under artificial image changes.
+
+    The reference image is changed by each perturbation in
+    PERTURBATION_LEVELS and matched against the unchanged original.
+    The ground-truth homography comes from common/perturb.py, so the
+    same evaluate_matches() is used as for HPatches pairs.
+    """
+
+    images, _ = load_scene(str(DATASET_ROOT), scene_name)
+
+    method = method.lower()
+    output_path = RESULTS_ROOT / method / "perturbations" / scene_name
+
+    img1 = images[REFERENCE_IMAGE]
+
+    # Detect features in the unchanged reference image (once per scene)
+    start = time.perf_counter()
+    kp1, desc1 = detect_and_describe(detector, img1)
+    ref_time_ms = (time.perf_counter() - start) * 1000
+
+    results = []
+
+    for kind, levels in PERTURBATION_LEVELS.items():
+        for level in levels:
+            img2, H = perturb(img1, kind, level)
+
+            # Detect features in the changed image
+            start = time.perf_counter()
+            kp2, desc2 = detect_and_describe(detector, img2)
+            detect_time_ms = (time.perf_counter() - start) * 1000
+
+            # Match descriptors
+            start = time.perf_counter()
+            matches = match_descriptors(desc1, desc2)
+            match_time_ms = (time.perf_counter() - start) * 1000
+
+            # Evaluate matches using the known homography
+            (
+                correct_count,
+                precision,
+                mean_error,
+                errors,
+                correct_mask
+            ) = evaluate_matches(
+                kp1,
+                kp2,
+                matches,
+                H,
+                img2.shape,
+                REPROJECTION_THRESHOLD
+            )
+
+            if SAVE_PERTURBATION_VISUALIZATIONS:
+                save_match_visualizations(
+                    img1,
+                    kp1,
+                    img2,
+                    kp2,
+                    matches,
+                    correct_mask,
+                    scene_name,
+                    f"{kind}_{level}",   
+                    output_path,
+                    method=method
+                )
+
+            results.append({
+                "method": method.upper(),
+                "scene": scene_name,
+                "change_type": (
+                    "illumination"
+                    if scene_name.startswith("i_")
+                    else "viewpoint"
+                ),
+                "perturbation": kind,
+                "level": level,
+                "reference_keypoints": len(kp1),
+                "target_keypoints": len(kp2),
+                "accepted_matches": len(matches),
+                "correct_matches": correct_count,
+                "incorrect_matches": len(matches) - correct_count,
+                "match_precision_percent": round(precision, 2),
+                "mean_reprojection_error_px": (
+                    round(mean_error, 3)
+                    if mean_error is not None else ""
+                ),
+                "reference_detection_ms": round(ref_time_ms, 3),
+                "target_detection_ms": round(detect_time_ms, 3),
+                "matching_ms": round(match_time_ms, 3)
+            })
+
+            print(
+                f"  {kind:>8} {level:>6} | "
+                f"Keypoints: {len(kp2)} | "
+                f"Accepted: {len(matches)} | "
+                f"Correct: {correct_count} | "
+                f"Precision: {precision:.2f}%"
+            )
 
     return results
 
