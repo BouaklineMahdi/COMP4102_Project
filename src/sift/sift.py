@@ -30,7 +30,7 @@ from .sift_features import (
     match_descriptors
 )
 
-from .sift_visualize import save_match_visualizations
+from common.visualize import save_match_visualizations
 
 
 # SIFT-specific output directory
@@ -108,7 +108,8 @@ def run_scene(scene_name, detector):
             correct_mask,
             scene_name,
             i,
-            output_path
+            output_path,
+            method="SIFT"
         )
 
         # Record evaluation metrics
