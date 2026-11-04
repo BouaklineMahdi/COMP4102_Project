@@ -22,16 +22,16 @@ SCENES = [
     # Illumination changes
     "i_ajuntament",
     "i_books",
-    "i_leuven",
-    "i_fog",
-    "i_crownnight",
+    # "i_leuven",
+    # "i_fog",
+    # "i_crownnight",
 
     # Viewpoint changes
     "v_graffiti",
     "v_boat",
-    "v_bricks",
-    "v_wall",
-    "v_laptop",
+    # "v_bricks",
+    # "v_wall",
+    # "v_laptop",
 ]
 
 
