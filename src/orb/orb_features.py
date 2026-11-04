@@ -1,0 +1,62 @@
+"""
+ORB: Oriented FAST and Rotated BRIEF (Rublee, Rabaud, Konolige, Bradski, ICCV 2011).
+
+I'm going to implement a 3-function contract that common/evaluate.py eventually expects. @Liam sift/ must provide
+the same three functions with the same arguments so both methods run through identical code.
+
+External sources: OpenCV ORB tutorial https://docs.opencv.org/4.x/d1/d89/tutorial_py_orb.html,
+OpenCV feature matching tutorial https://docs.opencv.org/4.x/dc/dc3/tutorial_py_matcher.html,
+ORB class reference https://docs.opencv.org/4.x/db/d95/classcv_1_1ORB.html.
+"""
+import cv2
+
+NAME = "ORB"
+
+# OpenCV defaults 
+DEFAULTS = {
+    "n_features": 1000,      # OpenCV default is 500, we will use the same value for SIFT
+    "scale_factor": 1.2,
+    "n_levels": 8,
+    "edge_threshold": 31,
+    "fast_threshold": 20,
+    "patch_size": 31,
+    "wta_k": 2,              # compare pixel PAIRS (2) -> 1 bit per test
+}
+
+
+def create_detector(n_features=DEFAULTS["n_features"], scale_factor=DEFAULTS["scale_factor"], n_levels=DEFAULTS["n_levels"], fast_threshold=DEFAULTS["fast_threshold"]):
+    """
+    Create an OpenCV ORB detector/descriptor.
+    """
+    return cv2.ORB_create(nfeatures=n_features,
+                          scaleFactor=scale_factor,
+                          nlevels=n_levels,
+                          edgeThreshold=DEFAULTS["edge_threshold"],
+                          firstLevel=0,
+                          WTA_K=DEFAULTS["wta_k"],
+                          # rank FAST points with Harris
+                          scoreType=cv2.ORB_HARRIS_SCORE,  
+                          patchSize=DEFAULTS["patch_size"],
+                          fastThreshold=fast_threshold)
+
+
+def detect_and_describe(detector, gray):
+    """
+    Detect keypoints and compute descriptors on a grayscale uint8 image.
+
+    Returns (keypoints, descriptors). descriptors is an N x 32 uint8 array, or None when no
+    keypoint was found (e.g. a very dark image).
+    """
+    keypoints, descriptors = detector.detectAndCompute(gray, None)
+    return keypoints, descriptors
+
+
+def match_descriptors(desc1, desc2, ratio=0.8):
+    """
+    Match image-1 descriptors to image-2 descriptors with Hamming distance + Lowe's ratio test.
+
+    For each image-1 descriptor we take its 2 nearest image-2 descriptors and keep the best one only 
+    if best.distance < ratio * second.distance. ratio >= 1 disables the test (keeps every nearest neighbour).
+    @ Samy for you to implement
+    """
+
