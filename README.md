@@ -71,8 +71,8 @@ COMP4102_Project/
 │   ├── evaluate.py            # Ground-truth match evaluation
 │   ├── runner.py              # Shared experiment execution and CSV export
 │   ├── visualize.py           # Match visualization generation
-│   ├── perturb.py             # Additional image transformations (planned)
-│   └── plots.py               # Results plotting (planned)
+│   ├── perturb.py             # Additional image transformations
+│   └── plots.py               # SIFT and ORB comparison plots
 │
 ├── data/
 │   └── hpatches-sequences-release/
@@ -86,13 +86,18 @@ COMP4102_Project/
 │   │   ├── ...
 │   │   └── sift_results.csv
 │   │
-│   └── orb/
-│       ├── i_ajuntament/
-│       │   ├── all_matches/
-│       │   ├── correct_matches/
-│       │   └── incorrect_matches/
-│       ├── ...
-│       └── orb_results.csv
+│   ├── orb/
+│   │   ├── i_ajuntament/
+│   │   │   ├── all_matches/
+│   │   │   ├── correct_matches/
+│   │   │   └── incorrect_matches/
+│   │   ├── ...
+│   │   └── orb_results.csv
+│   │
+│   └── plots/                 # Generated comparison graphs
+│       ├── precision_comparison.png
+│       ├── correct_matches_comparison.png
+│       └── runtime_comparison.png
 │
 └── report/                    # Final project report
 ```
@@ -266,6 +271,46 @@ A CSV file is also generated for each algorithm:
 
 Both CSV files use the same column structure, allowing direct comparison between algorithms.
 
+### Generating Comparison Plots
+
+The `common/plots.py` file was implemented to compare the results of SIFT and ORB using their generated CSV files.
+
+To generate the plots, run the following command from the project root:
+
+```bash
+python3 -m common.plots
+```
+
+The script reads:
+
+- `results/sift/sift_results.csv`
+- `results/orb/orb_results.csv`
+
+Both files must exist before running the comparison.
+
+The script generates three baseline comparison plots:
+
+1. **Matching precision:** Compares the average percentage of correct matches under illumination and viewpoint changes.
+2. **Correct matches:** Compares the average number of geometrically correct matches found by each algorithm.
+3. **Runtime:** Compares the average time used for target feature detection and descriptor matching, measured in milliseconds.
+
+All generated plots are saved in:
+
+```text
+results/plots/
+```
+
+The generated files are:
+
+```text
+precision_comparison.png
+correct_matches_comparison.png
+runtime_comparison.png
+```
+
+The plotting file contains functions for comparing rotation, scaling, blur, and darkening at different transformation levels. 
+- These functions require perturbation experiment results
+
 If a CSV cannot be overwritten because of a permissions error, the runner attempts to save a timestamped CSV instead.
 
 ## Implementing an Algorithm
@@ -351,6 +396,10 @@ ORB should use:
 6. Verify that `python main.py -orb` runs successfully.
 7. Compare the generated `orb_results.csv` with `sift_results.csv`.
 
+ORB descriptor matching function has been implemented
+- function uses cv2.BFmatcher with cv2.NORM_HAMMING --> since ORD uses binary descriptors
+- Matching is done using K-nearest-neighbor (K=2), along with lowes ratio test with a .8 threshold
+
 No separate ORB experiment runner, evaluation function, visualization function, or CSV exporter is required.
 
 The shared pipeline already provides those features.
@@ -372,7 +421,7 @@ The shared runner ensures consistent evaluation and output formatting, but algor
 
 The following functionality is planned:
 
-- Implement and integrate additional image transformations using `common/perturb.py`.
+- Integrate existing image transformations from `common/perturb.py` into the experiment runner.
 - Evaluate robustness under rotation, scaling, blur, and darkening.
 - Generate comparison plots using `common/plots.py`.
 - Compare SIFT and ORB accuracy and runtime across different conditions.

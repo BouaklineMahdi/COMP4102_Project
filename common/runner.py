@@ -319,7 +319,7 @@ def clear_results(method):
     print(f"Cleared previous {method.upper()} results.")
 
 
-def run_experiments(method, create_detector, detect_and_describe, match_descriptors):
+def run_experiments(method, create_detector, detect_and_describe, match_descriptors,run_perturbations=False ):
     """
     Run HPatches experiments for SIFT or ORB.
 

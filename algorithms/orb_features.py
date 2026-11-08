@@ -57,6 +57,26 @@ def match_descriptors(desc1, desc2, ratio=0.8):
 
     For each image-1 descriptor we take its 2 nearest image-2 descriptors and keep the best one only 
     if best.distance < ratio * second.distance. ratio >= 1 disables the test (keeps every nearest neighbour).
-    @ Samy for you to implement
     """
+    if desc1 is None or desc2 is None: #cheching for missing desc
+        return []
+
+    if len(desc1) == 0 or len(desc2) < 2: #Check the desc counts
+        return []
+
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING) #creating the matcher and we use hamming distance as this is where ORB is different form SIFT
+
+    matches = matcher.knnMatch(desc1, desc2, k=2) #Finding two nearest matches
+
+    good_matches = []
+
+    for pair in matches:
+        if len(pair) < 2:
+            continue
+        m, n = pair
+
+        if ratio >= 1 or m.distance < (ratio *n.distance): #applying Lowes ratio test to see if good match
+            good_matches.append(m)
+
+    return good_matches
 
