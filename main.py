@@ -30,6 +30,12 @@ def main():
         help="Run ORB experiments"
     )
 
+    parser.add_argument(
+        "-perturb",
+        action="store_true",
+        help="Run perturbation experiments"
+    )
+
     args = parser.parse_args()
 
     if not args.sift and not args.orb:
