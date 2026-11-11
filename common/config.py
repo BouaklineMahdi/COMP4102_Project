@@ -18,22 +18,44 @@ RESULTS_ROOT = PROJECT_ROOT / "results"
 
 
 # HPatches scenes used for comparison
+# True  -> evaluate every scene found in DATASET_ROOT (all 116: 57 i_, 59 v_)
+# False -> evaluate only the scenes listed in SCENES
+USE_ALL_SCENES = True
+
+# HPatches scenes used for comparison
 SCENES = [
     # Illumination changes
     "i_ajuntament",
     "i_books",
-    # "i_leuven",
-    # "i_fog",
-    # "i_crownnight",
-
+    "i_leuven",
+    "i_fog",
+    "i_crownnight",
+ 
     # Viewpoint changes
     "v_graffiti",
     "v_boat",
-    # "v_bricks",
-    # "v_wall",
-    # "v_laptop",
+    "v_bricks",
+    "v_wall",
+    "v_laptop",
 ]
 
+# Scenes used for the artificial perturbation experiments (-perturb).
+# Kept to a subset because every scene is tested at every level in
+# PERTURBATION_LEVELS (25 image pairs per scene per algorithm).
+PERTURBATION_SCENES = SCENES
+
+# Shared detector and matching parameters
+# Passed to BOTH algorithms by common/runner.py so they cannot drift apart.
+N_FEATURES = 1000  # keypoint budget per image
+
+# Lowe's ratio test threshold. 0.8 is the value recommended by Lowe (2004):
+# it rejects about 90% of false matches while discarding under 5% of correct ones.
+LOWE_RATIO = 0.8
+ 
+# The ratio test alone allows many reference keypoints to match the SAME
+# target keypoint (e.g. a blurred target with only a few keypoints).
+# True -> keep only the closest match for each target keypoint (one-to-one).
+ONE_TO_ONE_MATCHES = True
 
 # Shared evaluation parameters
 REPROJECTION_THRESHOLD = 3.0  # pixels
@@ -50,4 +72,8 @@ PERTURBATION_LEVELS = {
     "darken": [1.0, 0.8, 0.6, 0.4, 0.2, 0.1],       # intensity multiplier
 }
 
+SAVE_VISUALIZATIONS = True
+
+VISUALIZE_SCENES = SCENES
+ 
 SAVE_PERTURBATION_VISUALIZATIONS = True

@@ -48,6 +48,39 @@ def save_plot(filename):
 
     print(f"Saved {filename}")
 
+def get_pooled_precision(rows):
+    """
+    Precision over a group of image pairs, pooled:
+        100 * (total correct matches) / (total accepted matches)
+ 
+    Averaging per-pair percentages lets a pair with 19 matches count as
+    much as one with 900, which makes the curves noisy when an image is
+    heavily degraded. Pooling weights every match equally.
+    """
+ 
+    if len(rows) == 0:
+        return None
+ 
+    correct = 0
+    accepted = 0
+ 
+    for row in rows:
+        correct += float(row["correct_matches"])
+        accepted += float(row["accepted_matches"])
+ 
+    if accepted == 0: #no matches at all -> precision reported as 0%
+        return 0.0
+ 
+    return 100 * correct / accepted
+ 
+ 
+def summarize(rows, column):
+    """Pooled precision for the precision column, plain average otherwise."""
+ 
+    if column == "match_precision_percent":
+        return get_pooled_precision(rows)
+ 
+    return get_average(rows, column)
 
 def plot_comparison(sift, orb, column, ylabel, filename):
     categories = ["illumination", "viewpoint"]
@@ -68,8 +101,8 @@ def plot_comparison(sift, orb, column, ylabel, filename):
             if row.get("change_type") == category and not row.get("perturbation"):
                 orb_rows.append(row)
 
-        sift_values.append(get_average(sift_rows,column))
-        orb_values.append(get_average(orb_rows, column))
+        sift_values.append(summarize(sift_rows, column))
+        orb_values.append(summarize(orb_rows, column))
 
     if None in sift_values or None in orb_values: #checking for missing results
         print(f"Missing data for {filename}")
@@ -150,24 +183,23 @@ def load_perturbations(method):
 
 def get_level_averages(rows, kind, column):
     grouped = defaultdict(list)
-
+ 
     for row in rows:
         if row.get("perturbation") != kind:
             continue
-
+ 
         level = row.get("level")
-        value = row.get(column)
-
-        if level in (None, "") or value in (None, ""):
+ 
+        if level in (None, "") or row.get(column) in (None, ""):
             continue
-
-        grouped[float(level)].append(float(value)) #grouping results by transformation level
-
+ 
+        grouped[float(level)].append(row) #grouping results by transformation level
+ 
     averages = {}
-
-    for level, values in grouped.items():
-        averages[level] = sum(values) / len(values)
-
+ 
+    for level, level_rows in grouped.items():
+        averages[level] = summarize(level_rows, column) #pooled precision or plain average
+ 
     return averages
 
 
@@ -221,7 +253,7 @@ def generate_plots():
     plot_comparison(
         sift, orb,
         "match_precision_percent",
-        "Match precision (%)",
+        "Match precision (%, pooled)",
         "precision_comparison.png"
     )
 
@@ -249,7 +281,7 @@ def generate_plots():
             sift_perturb, orb_perturb,
             kind,
             "match_precision_percent",
-            "Match precision (%)"
+            "Match precision (%, pooled)"
         )
 
         plot_perturbation(
