@@ -67,9 +67,10 @@ def get_pooled_precision(rows):
     for row in rows:
         correct += float(row["correct_matches"])
         accepted += float(row["accepted_matches"])
- 
-    if accepted == 0: #no matches at all -> precision reported as 0%
-        return 0.0
+
+    # Fix: This was skewing graph results
+    if accepted == 0: # no matches at all -> precision is undefined, not 0%
+        return None
  
     return 100 * correct / accepted
  
@@ -214,13 +215,20 @@ def plot_perturbation(sift, orb, kind, column, ylabel):
     plt.figure(figsize=(8, 5))
 
     for method, values in [("SIFT", sift_values), ("ORB", orb_values)]:
-        levels = sorted(values.keys())
+        levels = []
         averages = []
 
-        for level in levels:
+        for level in sorted(values.keys()):
+            if values[level] is None: #no accepted matches -> leave the point out
+                continue
+            levels.append(level)
             averages.append(values[level])
 
-        plt.plot(levels, averages, marker="o", label=method) #drawing the comparison line
+        #SIFT dashed with square markers and drawn on top, so it stays visible where the lines overlap
+        if method == "SIFT":
+            plt.plot(levels, averages, marker="s", linestyle="--", markersize=7, zorder=3, label=method)
+        else:
+            plt.plot(levels, averages, marker="o", zorder=2, label=method)
 
     labels = {
         "rotation": "Rotation angle (degrees)",
