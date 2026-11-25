@@ -6,300 +6,188 @@ COMP 4102 (Computer Vision), Carleton University, Fall 2026
 
 **Group:** Mahdi Bouakline, Liam Bennet, Samy Kaddour
 
----
-
 ## Overview
 
-This project compares two local feature detection and matching algorithms:
+This project compares SIFT and ORB using OpenCV. SIFT uses 128-dimensional floating-point descriptors and L2 distance, while ORB uses 256-bit binary descriptors and Hamming distance.
 
-- **SIFT (Scale-Invariant Feature Transform):** floating-point descriptors (128 values), matched with L2 distance.
-- **ORB (Oriented FAST and Rotated BRIEF):** binary descriptors (256 bits), matched with Hamming distance.
-
-Both are evaluated for accuracy and speed under:
-
-- **Viewpoint and illumination changes:** the HPatches image sequences.
-- **Rotation, scale, blur, and darkening:** artificial changes applied to image 1 of a scene, each with a known ground-truth homography.
-
-Both algorithms run through one shared pipeline (dataset loading, matching filters, evaluation, timing, visualizations, CSV output). The keypoint budget and ratio-test threshold are defined once in `common/config.py` and passed to both algorithms, so the settings cannot differ between them.
-
-## Metrics
-
-Each image pair produces one CSV row with these metrics:
-
-| Metric | Description |
-|---|---|
-| Reference Keypoints | Features detected in the reference image (image 1). |
-| Target Keypoints | Features detected in the target image (images 2–6, or the perturbed image). |
-| Raw Matches | Matches that passed Lowe's ratio test, before the one-to-one filter. |
-| Accepted Matches | Matches kept after the one-to-one filter (see [Matching](#matching)). |
-| Correct Matches | Accepted matches whose reprojection error is at most the threshold **and** whose projected point lies inside the target image. |
-| Incorrect Matches | Accepted matches that are not correct. |
-| Match Precision (%) | Correct Matches / Accepted Matches × 100 (0% when no matches are accepted). |
-| Mean Reprojection Error (px) | Average reprojection error over matches whose projection lands inside the target image, correct or not. |
-| Reference Detection Time (ms) | Time to detect and describe features in the reference image. |
-| Target Detection Time (ms) | Time to detect and describe features in the target image. |
-| Matching Time (ms) | Time to match the two descriptor sets, including the ratio test and one-to-one filter. |
-
-**Match correctness:** a match is correct when the reference keypoint, projected by the ground-truth homography, lands within **3 pixels** of its matched target keypoint. The homography maps image 1 coordinates to the target image (HPatches `H_1_k`, or the perturbation's H).
-
-**Precision in plots is pooled:** for a group of image pairs, the plots use (total correct) / (total accepted) × 100, not the average of each pair's percentage. A pair with 19 matches would otherwise count as much as one with 900, which makes heavily degraded levels noisy. The CSVs still store each pair's own precision.
-
-Timing excludes image loading, visualization, evaluation, and CSV writing.
-
-## Matching
-
-Both algorithms use the same matching steps:
-
-1. **Nearest neighbours:** brute-force matcher, k = 2 (L2 for SIFT, Hamming for ORB).
-2. **Lowe's ratio test:** keep a match only if `best.distance < LOWE_RATIO × second_best.distance`. `LOWE_RATIO = 0.8`, the value recommended by Lowe (2004), which rejects about 90% of false matches while discarding fewer than 5% of correct ones.
-3. **One-to-one filter** (`ONE_TO_ONE_MATCHES = True`): matching runs from every reference descriptor, so several reference keypoints can match the *same* target keypoint. When the target image has few keypoints (e.g. strong blur), that inflates the match counts: in testing, ORB once reported 187 matches against a target image with only 4 keypoints. The filter keeps only the closest match for each target keypoint. The raw count before filtering is kept in the `raw_matches` column.
-
-Steps 2 and 3 are applied in `common/runner.py`, so they are identical for both algorithms.
-
-## Repository Structure
-
-```text
-COMP4102_Project/
-├── README.md
-├── requirements.txt
-├── main.py                    # Command-line entry point
-│
-├── algorithms/                # Algorithm-specific code
-│   ├── sift_features.py       # SIFT detection, description, L2 matching
-│   └── orb_features.py        # ORB detection, description, Hamming matching
-│
-├── common/                    # Shared pipeline
-│   ├── config.py              # Paths, scenes, shared parameters, perturbation levels
-│   ├── dataset.py             # HPatches image and homography loading
-│   ├── runner.py              # Runs experiments, matching filters, timing, CSV export
-│   ├── evaluate.py            # Ground-truth match evaluation
-│   ├── perturb.py             # Rotation, scale, blur, darkening + ground-truth H
-│   ├── visualize.py           # Match visualization images
-│   └── plots.py               # SIFT vs ORB comparison plots
-│
-├── data/
-│   └── hpatches-sequences-release/   # Not tracked by git
-│
-├── results/
-│   ├── sift/
-│   │   ├── sift_results.csv          # HPatches pairs
-│   │   ├── sift_perturbations.csv    # Perturbation pairs (with -perturb)
-│   │   ├── <scene>/                  # Visualizations (VISUALIZE_SCENES only)
-│   │   │   ├── all_matches/
-│   │   │   ├── correct_matches/
-│   │   │   └── incorrect_matches/
-│   │   └── perturbations/<scene>/    # Perturbation visualizations
-│   ├── orb/                          # Same layout as sift/
-│   └── plots/                        # Comparison figures
-│
-└── report/                    # Final project report
-```
-
-| File | Responsibility |
-|---|---|
-| `main.py` | Parses command-line flags and selects the algorithms and experiments to run. |
-| `common/config.py` | Dataset paths, scene selection, shared detector/matching parameters, perturbation levels, visualization settings. |
-| `common/dataset.py` | Lists HPatches scenes; loads images (as grayscale) and ground-truth homographies. |
-| `common/runner.py` | Runs the HPatches and perturbation experiments, applies the shared matching filters, measures time, saves visualizations and CSVs. |
-| `common/evaluate.py` | Classifies matches as correct or incorrect using a ground-truth homography. |
-| `common/perturb.py` | Applies rotation, scale, blur, and darkening, and returns the ground-truth homography for each. |
-| `common/visualize.py` | Draws all, correct, and incorrect matches. |
-| `common/plots.py` | Reads the CSVs and generates the comparison figures. |
-
-The runner takes each algorithm's functions as arguments, so both methods run through the same code.
+Both methods use the same experiment runner, images, feature budget, matching settings and evaluation criteria. We test all 116 HPatches scenes (580 image pairs per method) and four controlled image transformations on ten selected scenes (250 additional pairs per method).
 
 ## Setup
 
-### 1. Clone the repository and install dependencies
+From the project root, install the dependencies:
 
-Python 3.9+ is recommended.
+```bash
+pip install -r requirements.txt
+```
+
+To obtain the project from GitHub, if needed:
 
 ```bash
 git clone https://github.com/BouaklineMahdi/COMP4102_Project.git
 cd COMP4102_Project
-pip install -r requirements.txt
 ```
 
-### 2. Download the HPatches dataset
-
-Download the **HPatches sequences release** (`hpatches-sequences-release.tar.gz`, approximately 1.3 GB) from the [HPatches dataset repository](https://github.com/hpatches/hpatches-dataset). Use the **sequences** release, not the **patches** release.
-
-Extract it into:
+Download hpatches-sequences-release.zip (about 1.3 GB) from https://huggingface.co/datasets/vbalnt/hpatches and extract it into data/ so the structure looks like this:
 
 ```text
 data/hpatches-sequences-release/
-├── i_ajuntament/       # Illumination changes
+├── i_ajuntament/
 ├── i_books/
-├── v_graffiti/         # Viewpoint changes
+├── v_graffiti/
 ├── v_boat/
 └── ...
 ```
 
-The dataset contains 116 scenes: 57 with illumination changes (`i_`) and 59 with viewpoint changes (`v_`). Each scene has six images (`1.ppm`–`6.ppm`) and five ground-truth homographies (`H_1_2`–`H_1_6`) mapping image 1 to each other image.
+The dataset contains 57 illumination scenes and 59 viewpoint scenes. Each scene contains six images (`1.ppm`–`6.ppm`) and five homographies (`H_1_2`–`H_1_6`) mapping image 1 to the other images. The dataset is not included in the repository.
 
-## Running Experiments
+## Running the experiments
 
-Run everything from the project root.
+Run these commands from the project root:
 
-| Command | What it runs |
+| Command | Description |
 |---|---|
-| `python main.py -sift` | SIFT on HPatches |
-| `python main.py -orb` | ORB on HPatches |
-| `python main.py -sift -orb` | Both on HPatches (SIFT first) |
-| `python main.py -sift -orb -perturb` | Both on HPatches **and** the perturbation experiments |
+| `python main.py -sift` | Run SIFT on HPatches. |
+| `python main.py -orb` | Run ORB on HPatches. |
+| `python main.py -sift -orb` | Run both methods on HPatches. |
+| `python main.py -sift -orb -perturb` | Run both methods on HPatches and the controlled transformations. |
+| `python -m common.plots` | Generate comparison plots from the saved CSVs. |
 
-At least one algorithm must be selected. `-perturb` adds the perturbation experiments to the selected algorithms; it does not run on its own.
+At least one algorithm must be selected when running `main.py`. The `-perturb` flag adds the controlled experiments to the HPatches evaluation.
 
-### Configuration (`common/config.py`)
+**Note:** Running an algorithm deletes and recreates its own results folder, including previous perturbation results. Back up any results you want to keep. Selected scene folders are checked before cleanup. Close open CSV files before running the experiments.
 
-| Setting | Default | Meaning |
-|---|---|---|
-| `USE_ALL_SCENES` | `True` | Evaluate all 116 HPatches scenes. Set to `False` to use only `SCENES`. |
-| `SCENES` | 10 scenes (5 `i_`, 5 `v_`) | Scene list used when `USE_ALL_SCENES = False`; also the default for the two settings below. |
-| `PERTURBATION_SCENES` | `SCENES` | Scenes used for the perturbation experiments. Each scene is tested at all 25 perturbation levels. |
-| `VISUALIZE_SCENES` | `SCENES` | Match images are saved only for these scenes (saving all 116 would write thousands of images). |
-| `N_FEATURES` | `1000` | Keypoint budget, passed to both algorithms. |
-| `LOWE_RATIO` | `0.8` | Ratio-test threshold, passed to both algorithms. |
-| `ONE_TO_ONE_MATCHES` | `True` | Keep only the closest match per target keypoint. |
-| `REPROJECTION_THRESHOLD` | `3.0` | Pixel threshold for a correct match. |
-| `PERTURBATION_LEVELS` | see file | Rotation (degrees), scale (factor), blur (Gaussian sigma), darken (intensity multiplier). |
-| `SAVE_VISUALIZATIONS` / `SAVE_PERTURBATION_VISUALIZATIONS` | `True` | Turn match images on or off. |
+The included CSVs can be used to regenerate the plots without downloading HPatches or rerunning the experiments.
 
-With the defaults, each algorithm is evaluated on 116 × 5 = **580 HPatches pairs**, plus 10 × 25 = **250 perturbation pairs** with `-perturb`.
+## Configuration
 
-### Perturbation experiments
+Experiment settings are stored in `common/config.py`. The settings used for the reported results are:
 
-For each scene in `PERTURBATION_SCENES`, image 1 is changed at every level in `PERTURBATION_LEVELS` and matched against the unchanged image 1:
-
-| Change | Ground-truth homography |
+| Setting | Value |
 |---|---|
-| Rotation | Rotation about the image centre; the canvas is enlarged so nothing is cut off. |
-| Scale | Scaling matrix, with OpenCV's pixel-centre convention. |
-| Blur, darken | Identity (no pixel moves). |
+| `USE_ALL_SCENES` | `True` (all 116 scenes) |
+| `SCENES` | 10 selected scenes (5 illumination, 5 viewpoint) |
+| `PERTURBATION_SCENES` | `SCENES` |
+| `VISUALIZE_SCENES` | `SCENES` |
+| `N_FEATURES` | 1000 |
+| `LOWE_RATIO` | 0.8 |
+| `ONE_TO_ONE_MATCHES` | `True` |
+| `REPROJECTION_THRESHOLD` | 3.0 pixels |
 
-Level 0 rotation, scale 1.0, blur 0 and darken 1.0 leave the image unchanged, so they should give 100% precision. They serve as a check that the ground-truth homographies are correct.
+Set `USE_ALL_SCENES = False` to run only the scenes listed in `SCENES`. The `SAVE_VISUALIZATIONS` and `SAVE_PERTURBATION_VISUALIZATIONS` settings control whether match images are saved.
 
-### Automatic results cleanup
+### Controlled transformations
 
-Before running an algorithm, its results folder (`results/sift/` or `results/orb/`) is deleted and recreated. Running one algorithm never deletes the other's results. The selected scenes are checked **before** anything is deleted, so a missing scene stops the run without losing previous results. Close any open CSV files first (particularly in Excel on Windows); if a CSV can't be overwritten, a timestamped copy is saved instead.
+| Transformation | Levels |
+|---|---|
+| Rotation (degrees) | 0, 15, 30, 45, 60, 90, 135, 180 |
+| Scale | 0.25, 0.5, 0.75, 1, 1.5, 2 |
+| Gaussian blur (sigma) | 0, 1, 2, 4, 8 |
+| Brightness multiplier | 0.1, 0.2, 0.4, 0.6, 0.8, 1 |
+
+Each transformed image is matched against the original image 1. Rotation and scaling return the corresponding homography; blur and darkening use the identity matrix. Rotation expands the canvas to avoid cropping. The unchanged-image conditions serve as basic checks of the pipeline.
+
+## Matching and evaluation
+
+1. Detect keypoints and compute descriptors using OpenCV.
+2. Find the two nearest descriptors using `BFMatcher` (L2 for SIFT, Hamming for ORB).
+3. Apply Lowe's ratio test (`d1 < 0.8 * d2`) in each algorithm module.
+4. In the shared runner, keep only the lowest-distance match for each target keypoint. This prevents duplicate target matches but is not a bidirectional matching check.
+5. Project reference keypoints using the known homography. A match is correct if the projected point is inside the target image and within 3 pixels of the matched target keypoint.
+
+The feature budget is shared, but the detectors may return different numbers of keypoints. SIFT can also return slightly more than the requested budget due to multiple orientations.
+
+### Metrics
+
+| Metric | Description |
+|---|---|
+| Reference / target keypoints | Number of detected features in each image. |
+| Raw matches | Matches passing the ratio test, before one-to-one filtering. |
+| Accepted matches | Matches remaining after one-to-one filtering. |
+| Correct / incorrect matches | Accepted matches classified using the ground-truth homography. |
+| Match precision (%) | Correct matches divided by accepted matches, multiplied by 100. |
+| Mean reprojection error (px) | Average error for matches whose projected points are inside the target image. |
+| Reference detection time (ms) | Reference feature detection and descriptor computation. |
+| Target detection time (ms) | Target feature detection and descriptor computation. |
+| Matching time (ms) | Descriptor matching, ratio test and one-to-one filtering. |
+
+Precision is mathematically undefined when no matches are accepted. The per-pair CSV stores 0 in this case, but comparison plots calculate pooled precision from total correct and accepted matches. If the total accepted count is zero, the plotted value is omitted. This occurs for SIFT at brightness 0.1.
+
+Runtime comparisons use target detection and descriptor computation plus matching time. Reference features are computed separately and reused for the target pairs. Timing excludes image loading, evaluation, visualization, plotting and CSV writing.
+
+## Repository structure
+
+```text
+COMP4102_Project/
+├── algorithms/
+│   ├── __init__.py
+│   ├── orb_features.py
+│   └── sift_features.py
+├── common/
+│   ├── __init__.py
+│   ├── config.py
+│   ├── dataset.py
+│   ├── evaluate.py
+│   ├── perturb.py
+│   ├── plots.py
+│   ├── runner.py
+│   └── visualize.py
+├── report/                    # Final project report
+├── results/
+│   ├── orb/
+│   │   ├── orb_results.csv
+│   │   └── orb_perturbations.csv
+│   ├── sift/
+│   │   ├── sift_results.csv
+│   │   └── sift_perturbations.csv
+│   └── plots/                 # 11 comparison plots
+├── .gitignore
+├── main.py
+├── README.md
+└── requirements.txt
+```
+
+`main.py` selects the algorithms. `common/runner.py` runs the experiments and saves results, `dataset.py` loads images and homographies, `evaluate.py` checks match correctness, `perturb.py` applies transformations, and `plots.py` generates the comparison figures. `visualize.py` draws match images.
+
+The dataset folder is added locally during setup. Match visualization folders can also be generated during experiments; they are not shown in the submitted folder structure above.
 
 ## Results
 
-### CSV files
+Each algorithm has 580 HPatches CSV rows and 250 perturbation CSV rows. The perturbation files include the transformation type and level.
 
-| File | Contents |
-|---|---|
-| `results/<method>/<method>_results.csv` | One row per HPatches pair. |
-| `results/<method>/<method>_perturbations.csv` | One row per perturbation pair, with `perturbation` and `level` columns. |
+The 11 plots in `results/plots/` include:
 
-SIFT and ORB files have identical columns.
+- `precision_comparison.png`: pooled HPatches precision.
+- `correct_matches_comparison.png`: average correct matches on HPatches.
+- `runtime_comparison.png`: average target detection and matching time.
+- `<kind>_match_precision_percent.png`: pooled precision for each transformation.
+- `<kind>_correct_matches.png`: average correct matches for each transformation.
 
-### Visualizations
+Here, `<kind>` is `rotation`, `scale`, `blur` or `darken`. Perturbation plots require both algorithms' perturbation CSVs. SIFT uses dashed lines with square markers and ORB uses solid lines with circular markers in the updated perturbation plots.
 
-For each scene in `VISUALIZE_SCENES`:
+When enabled, match visualizations are saved in scene folders under each algorithm's results directory (under `perturbations/` for controlled transformations). They include `all_matches/` (cyan), `correct_matches/` (green) and `incorrect_matches/` (red).
 
-| Folder | Contents |
-|---|---|
-| `all_matches/` | All accepted matches (cyan). |
-| `correct_matches/` | Correct matches (green). |
-| `incorrect_matches/` | Incorrect matches (red). |
+### Main findings
 
-Files are named `matches_1_vs_<k>.jpg` for HPatches pairs and `matches_1_vs_<kind>_<level>.jpg` for perturbations.
+- SIFT produces about 15% more correct matches under illumination changes and 44% more under viewpoint changes.
+- ORB is about 6–7 times faster in the HPatches runtime comparison.
+- SIFT performs better under heavy blur, large scale changes and most tested rotations.
+- ORB produces more correct matches under moderate blur and darkening.
+- High precision does not necessarily mean there are enough correct matches to be useful.
 
-### Comparison plots
+The report in `report/` contains the detailed results, analysis, limitations and examples of successful and failed matches.
 
-After both algorithms have run:
+### Benchmark environment
 
-```bash
-python -m common.plots
-```
-
-Figures are saved to `results/plots/`:
-
-| File | Shows |
-|---|---|
-| `precision_comparison.png` | Pooled precision, illumination vs viewpoint. |
-| `correct_matches_comparison.png` | Average correct matches, illumination vs viewpoint. |
-| `runtime_comparison.png` | Average target detection + matching time. |
-| `<kind>_match_precision_percent.png` | Pooled precision vs perturbation level (one per change type). |
-| `<kind>_correct_matches.png` | Average correct matches vs perturbation level. |
-
-Perturbation plots are generated only when both `*_perturbations.csv` files exist.
-
-## Algorithm Interface
-
-Each algorithm module in `algorithms/` provides three functions, which `main.py` passes to `common.runner.run_experiments()`:
-
-```python
-def create_detector(n_features):
-    """Create and return the OpenCV detector with the given keypoint budget."""
-
-def detect_and_describe(detector, gray):
-    """Return (keypoints, descriptors). descriptors is None if no keypoints are found."""
-
-def match_descriptors(desc1, desc2, ratio):
-    """Return the list of cv2.DMatch objects passing Lowe's ratio test."""
-```
-
-The runner supplies `n_features` and `ratio` from `config.py`.
-
-### SIFT (`algorithms/sift_features.py`)
-
-| Parameter | Value |
-|---|---|
-| `nfeatures` | `N_FEATURES` (1000) |
-| `contrastThreshold` | 0.04 (OpenCV default) |
-| `edgeThreshold` | 10 (OpenCV default) |
-| `sigma` | 1.6 (OpenCV default) |
-| Matcher | `cv2.BFMatcher(cv2.NORM_L2)`, k = 2 |
-
-### ORB (`algorithms/orb_features.py`)
-
-| Parameter | Value |
-|---|---|
-| `nfeatures` | `N_FEATURES` (1000; OpenCV default is 500) |
-| `scaleFactor` | 1.2 (OpenCV default) |
-| `nlevels` | 8 (OpenCV default) |
-| `edgeThreshold` | 31 (OpenCV default) |
-| `fastThreshold` | 20 (OpenCV default) |
-| `patchSize` | 31 (OpenCV default) |
-| `WTA_K` | 2 (OpenCV default: each test compares a pixel pair, giving 1 bit) |
-| `scoreType` | `ORB_HARRIS_SCORE` (OpenCV default: FAST keypoints ranked by Harris response) |
-| Matcher | `cv2.BFMatcher(cv2.NORM_HAMMING)`, k = 2. ORB descriptors are binary, so Hamming distance (number of differing bits) is used; FLANN KD-trees don't accept binary descriptors. |
-
-## Fair Comparison
-
-- Both algorithms use the same image pairs and ground-truth homographies.
-- `N_FEATURES`, `LOWE_RATIO`, the one-to-one filter, and the reprojection threshold come from `config.py` and are identical for both.
-- Timing is measured the same way, on the same machine, in the same run.
-- Accepted-match counts differ between the algorithms, so precision should always be read alongside the number of correct matches.
-- SIFT can return slightly more than `N_FEATURES` keypoints, because keypoints with several dominant orientations are duplicated.
-
-## Future Work
-
-- Plot precision by HPatches pair difficulty (1–2 through 1–6).
-- Estimate homographies with RANSAC from the accepted matches, and measure inlier counts and corner error.
-- Vary the keypoint budget (`N_FEATURES`) to study the accuracy/runtime trade-off.
+Windows, Intel Core i5-10400F (6 cores, 12 threads, 2.90 GHz), 12 GB DDR4 RAM, NVIDIA GeForce GTX 1650 SUPER (4 GB VRAM), Python 3.13.1 and OpenCV 5.0.0. Timings are single-run measurements and may differ on other machines.
 
 ## References
 
-### Methods and dataset
-
-- D. G. Lowe, "Distinctive Image Features from Scale-Invariant Keypoints," *International Journal of Computer Vision*, 60(2), 2004. (SIFT, ratio test)
-- E. Rublee, V. Rabaud, K. Konolige, G. Bradski, "ORB: An Efficient Alternative to SIFT or SURF," *ICCV*, 2011.
-- E. Rosten, T. Drummond, "Machine Learning for High-Speed Corner Detection," *ECCV*, 2006. (FAST, used by ORB)
-- M. Calonder, V. Lepetit, C. Strecha, P. Fua, "BRIEF: Binary Robust Independent Elementary Features," *ECCV*, 2010. (used by ORB)
-- C. Harris, M. Stephens, "A Combined Corner and Edge Detector," *Alvey Vision Conference*, 1988. (ORB keypoint ranking)
-- V. Balntas, K. Lenc, A. Vedaldi, K. Mikolajczyk, "HPatches: A Benchmark and Evaluation of Handcrafted and Learned Local Descriptors," *CVPR*, 2017. https://github.com/hpatches/hpatches-dataset
-
-### Libraries and documentation
-
-- G. Bradski, "The OpenCV Library," *Dr. Dobb's Journal of Software Tools*, 2000. https://opencv.org
-  - ORB tutorial: https://docs.opencv.org/4.x/d1/d89/tutorial_py_orb.html
-  - Feature matching (`BFMatcher`, `knnMatch`, `drawMatches`): https://docs.opencv.org/4.x/dc/dc3/tutorial_py_matcher.html
-  - `perspectiveTransform`: https://docs.opencv.org/4.x/d2/de8/group__core__array.html
-  - Geometric transformations (`warpPerspective`, `resize`): https://docs.opencv.org/4.x/da/d54/group__imgproc__transform.html
-  - Image filtering (`GaussianBlur`): https://docs.opencv.org/4.x/d4/d86/group__imgproc__filter.html
-- C. R. Harris et al., "Array programming with NumPy," *Nature*, 585, 2020. https://numpy.org (`loadtxt`, `linalg.norm`)
-- J. D. Hunter, "Matplotlib: A 2D Graphics Environment," *Computing in Science & Engineering*, 9(3), 2007. https://matplotlib.org
-- Python standard library: `argparse`, `csv`, `pathlib`, `shutil`, `time`, `collections`. https://docs.python.org/3/library/
+- Lowe, D. G. (2004). [Distinctive Image Features from Scale-Invariant Keypoints](https://doi.org/10.1023/B:VISI.0000029664.99615.94). IJCV.
+- Rublee, E., et al. (2011). [ORB: An Efficient Alternative to SIFT or SURF](https://doi.org/10.1109/ICCV.2011.6126544). ICCV.
+- Rosten, E., and Drummond, T. (2006). [Machine Learning for High-Speed Corner Detection](https://doi.org/10.1007/11744023_34). ECCV.
+- Calonder, M., et al. (2010). [BRIEF: Binary Robust Independent Elementary Features](https://doi.org/10.1007/978-3-642-15561-1_56). ECCV.
+- Harris, C., and Stephens, M. (1988). A Combined Corner and Edge Detector. Alvey Vision Conference.
+- Balntas, V., et al. (2017). HPatches: A Benchmark and Evaluation of Handcrafted and Learned Local Descriptors. CVPR. [Dataset](https://github.com/hpatches/hpatches-dataset).
+- OpenCV documentation: [ORB](https://docs.opencv.org/4.x/d1/d89/tutorial_py_orb.html), [feature matching](https://docs.opencv.org/4.x/dc/dc3/tutorial_py_matcher.html), [geometric transformations](https://docs.opencv.org/4.x/da/d54/group__imgproc__transform.html), [image filtering](https://docs.opencv.org/4.x/d4/d86/group__imgproc__filter.html), [perspectiveTransform](https://docs.opencv.org/4.x/d2/de8/group__core__array.html).
+- [NumPy documentation](https://numpy.org/doc/).
+- [Matplotlib documentation](https://matplotlib.org/stable/).

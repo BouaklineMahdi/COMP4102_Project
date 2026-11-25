@@ -1,9 +1,6 @@
 """
 ORB: Oriented FAST and Rotated BRIEF (Rublee, Rabaud, Konolige, Bradski, ICCV 2011).
 
-I'm going to implement a 3-function contract that common/evaluate.py eventually expects. @Liam sift/ must provide
-the same three functions with the same arguments so both methods run through identical code.
-
 External sources: OpenCV ORB tutorial https://docs.opencv.org/4.x/d1/d89/tutorial_py_orb.html,
 OpenCV feature matching tutorial https://docs.opencv.org/4.x/dc/dc3/tutorial_py_matcher.html,
 ORB class reference https://docs.opencv.org/4.x/db/d95/classcv_1_1ORB.html.
@@ -14,13 +11,13 @@ NAME = "ORB"
 
 # OpenCV defaults 
 DEFAULTS = {
-    "n_features": 1000,      # OpenCV default is 500, we will use the same value for SIFT
+    "n_features": 1000,      
     "scale_factor": 1.2,
     "n_levels": 8,
     "edge_threshold": 31,
     "fast_threshold": 20,
     "patch_size": 31,
-    "wta_k": 2,              # compare pixel PAIRS (2) -> 1 bit per test
+    "wta_k": 2,             
 }
 
 

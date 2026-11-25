@@ -18,7 +18,7 @@ RESULTS_ROOT = PROJECT_ROOT / "results"
 
 
 # HPatches scenes used for comparison
-# True  -> evaluate every scene found in DATASET_ROOT (all 116: 57 i_, 59 v_)
+# True  -> evaluate every scene found in DATASET_ROOT
 # False -> evaluate only the scenes listed in SCENES
 USE_ALL_SCENES = True
 
@@ -39,7 +39,7 @@ SCENES = [
     "v_laptop",
 ]
 
-# Scenes used for the artificial perturbation experiments (-perturb).
+# Scenes used for the artificial perturbation experiments.
 # Kept to a subset because every scene is tested at every level in
 # PERTURBATION_LEVELS (25 image pairs per scene per algorithm).
 PERTURBATION_SCENES = SCENES
